@@ -16,10 +16,19 @@ struct Node{
     string passengerName;
     Node* next;
 };
+struct WaitingNode{
+    int waitingID;
+    int flightID;
+    string passengerName;
+    WaitingNode* next;
+};
 Flight flights[MAX_FLIGHTS];
 int n = 0;
 Node* head = NULL;
 int nextBookingID = 101;
+WaitingNode* front = NULL;
+WaitingNode* rear = NULL;
+int nextWaitingID = 1;
 int searchFlightIndex(int id){
     for(int i = 0; i < n; i++){
         if(flights[i].flightID == id)
@@ -29,6 +38,15 @@ int searchFlightIndex(int id){
 }
 bool hasBookings(int id){
     Node* temp = head;
+    while(temp != NULL){
+        if(temp->flightID == id)
+            return true;
+        temp = temp->next;
+    }
+    return false;
+}
+bool hasWaitingPassengers(int id){
+    WaitingNode* temp = front;
     while(temp != NULL){
         if(temp->flightID == id)
             return true;
@@ -104,8 +122,8 @@ void deleteFlight(){
     if(position == -1){
         cout << "Flight not found." << endl;
     }
-    else if(hasBookings(id)){
-        cout << "Cancel its bookings before deleting this flight." << endl;
+    else if(hasBookings(id) || hasWaitingPassengers(id)){
+        cout << "Cancel its bookings and waiting-list entries before deleting this flight." << endl;
     }
     else{
         for(int i = position; i < n - 1; i++)
@@ -113,6 +131,24 @@ void deleteFlight(){
 			n--;
 			cout << "Flight deleted successfully." << endl;
 		}
+}
+void addToWaitingList(int id, string name){
+    WaitingNode* newNode = new WaitingNode;
+    newNode->waitingID = nextWaitingID;
+    newNode->flightID = id;
+    newNode->passengerName = name;
+    newNode->next = NULL;
+    if(front == NULL){
+        front = newNode;
+        rear = newNode;
+    }
+    else{
+        rear->next = newNode;
+        rear = newNode;
+    }
+    cout << "You have been added to the waiting list." << endl;
+    cout << "Waiting ID: " << nextWaitingID << endl;
+    nextWaitingID++;
 }
 void bookTicket(){
     int id;
@@ -129,19 +165,28 @@ void bookTicket(){
     else{
         cout << "Enter Passenger Name: ";
         cin >> name;
-
+if(flights[position].availableSeats == 0){
+            char choice;
+            cout << "No seats available. Join waiting list? (y/n): ";
+            cin >> choice;
+            if(choice == 'y' || choice == 'Y')
+                addToWaitingList(id, name);
+            else
+                cout << "Booking not made." << endl;
+        }
+        else{
         Node* newNode = new Node;
         newNode->bookingID = nextBookingID;
         newNode->flightID = id;
         newNode->passengerName = name;
         newNode->next = head;
         head = newNode;
-
         flights[position].availableSeats--;
         cout << "Ticket booked successfully." << endl;
         cout << "Booking ID: " << nextBookingID << endl;
         nextBookingID++;
     }
+}
 }
 void displayBookings(){
     if(head == NULL){
@@ -156,14 +201,43 @@ void displayBookings(){
         temp = temp->next;
     }
 }
+void giveSeatToWaitingPassenger(int flightID){
+    WaitingNode* temp = front;
+    WaitingNode* prev = NULL;
+    while(temp != NULL && temp->flightID != flightID){
+        prev = temp;
+        temp = temp->next;
+    }
+    if(temp == NULL){
+        int position = searchFlightIndex(flightID);
+        if(position != -1)
+            flights[position].availableSeats++;
+        return;
+    }
+    Node* newBooking = new Node;
+    newBooking->bookingID = nextBookingID;
+    newBooking->flightID = temp->flightID;
+    newBooking->passengerName = temp->passengerName;
+    newBooking->next = head;
+    head = newBooking;
+    if(prev == NULL)
+        front = temp->next;
+    else
+        prev->next = temp->next;
+
+    if(temp == rear)
+        rear = prev;
+    cout << "Waiting passenger " << temp->passengerName << " has been given the seat." << endl;
+    cout << "New Booking ID: " << nextBookingID << endl;
+    nextBookingID++;
+    delete temp;
+}
 void cancelBooking(){
     int id;
     cout << "Enter Booking ID to cancel: ";
     cin >> id;
-
     Node* temp = head;
     Node* prev = NULL;
-
     while(temp != NULL && temp->bookingID != id){
         prev = temp;
         temp = temp->next;
@@ -172,17 +246,14 @@ void cancelBooking(){
         cout << "Booking not found." << endl;
     }
     else{
-        int position = searchFlightIndex(temp->flightID);
+        int flightID = temp->flightID;
         if(prev == NULL)
             head = temp->next;
         else
             prev->next = temp->next;
-
-        if(position != -1)
-            flights[position].availableSeats++;
-
         delete temp;
         cout << "Booking cancelled successfully." << endl;
+		giveSeatToWaitingPassenger(flightID);
     }
 }
 int main(){
