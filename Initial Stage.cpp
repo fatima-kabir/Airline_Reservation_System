@@ -256,6 +256,47 @@ void cancelBooking(){
 		giveSeatToWaitingPassenger(flightID);
     }
 }
+void displayWaitingList(){
+    if(front == NULL){
+        cout << "Waiting list is empty." << endl;
+        return;
+    }
+    WaitingNode* temp = front;
+    cout << "\n===== WAITING LIST (FIFO) =====" << endl;
+    while(temp != NULL){
+        cout << "Waiting ID: " << temp->waitingID << endl;
+        cout << "Passenger Name: " << temp->passengerName << endl;
+        cout << "Flight ID: " << temp->flightID << endl;
+        temp = temp->next;
+    }
+}
+void cancelWaitingPassenger(){
+    int id;
+    cout << "Enter Waiting ID to remove: ";
+    cin >> id;
+    WaitingNode* temp = front;
+    WaitingNode* prev = NULL;
+    while(temp != NULL && temp->waitingID != id){
+        prev = temp;
+        temp = temp->next;
+    }
+
+    if(temp == NULL){
+        cout << "Waiting ID not found." << endl;
+    }
+    else{
+        if(prev == NULL)
+            front = temp->next;
+        else
+            prev->next = temp->next;
+
+        if(temp == rear)
+            rear = prev;
+
+        delete temp;
+        cout << "Waiting-list entry removed." << endl;
+    }
+}
 int main(){
     int choice;
     do{
@@ -267,6 +308,8 @@ int main(){
         cout << "5. Book Ticket" << endl;
         cout << "6. Display Bookings" << endl;
         cout << "7. Cancel Booking" << endl;
+		cout << "8. Display Waiting List" << endl;
+        cout << "9. Cancel Waiting-List Entry" << endl;
         cout << "0. Exit" << endl;
         cout << "Enter your choice: ";
         cin >> choice;
@@ -279,6 +322,8 @@ int main(){
             case 5: bookTicket(); break;
             case 6: displayBookings(); break;
             case 7: cancelBooking(); break;
+			case 8: displayWaitingList(); break;
+            case 9: cancelWaitingPassenger(); break;
             case 0: cout << "Program ended." << endl; break;
             default: cout << "Invalid choice." << endl;
         }
