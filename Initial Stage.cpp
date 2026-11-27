@@ -22,6 +22,16 @@ struct WaitingNode{
     string passengerName;
     WaitingNode* next;
 };
+struct StackNode{
+    int bookingID;
+    int flightID;
+    string passengerName;
+    bool passengerPromoted;
+    int promotedBookingID;
+    int promotedWaitingID;
+    string promotedPassengerName;
+    StackNode* next;
+};
 Flight flights[MAX_FLIGHTS];
 int n = 0;
 Node* head = NULL;
@@ -29,6 +39,7 @@ int nextBookingID = 101;
 WaitingNode* front = NULL;
 WaitingNode* rear = NULL;
 int nextWaitingID = 1;
+StackNode* top = NULL;
 int searchFlightIndex(int id){
     for(int i = 0; i < n; i++){
         if(flights[i].flightID == id)
@@ -159,13 +170,10 @@ void bookTicket(){
     if(position == -1){
         cout << "Flight not found." << endl;
     }
-    else if(flights[position].availableSeats == 0){
-        cout << "No seats available." << endl;
-    }
     else{
         cout << "Enter Passenger Name: ";
         cin >> name;
-if(flights[position].availableSeats == 0){
+        if(flights[position].availableSeats == 0){
             char choice;
             cout << "No seats available. Join waiting list? (y/n): ";
             cin >> choice;
@@ -175,18 +183,18 @@ if(flights[position].availableSeats == 0){
                 cout << "Booking not made." << endl;
         }
         else{
-        Node* newNode = new Node;
-        newNode->bookingID = nextBookingID;
-        newNode->flightID = id;
-        newNode->passengerName = name;
-        newNode->next = head;
-        head = newNode;
-        flights[position].availableSeats--;
-        cout << "Ticket booked successfully." << endl;
-        cout << "Booking ID: " << nextBookingID << endl;
-        nextBookingID++;
+            Node* newNode = new Node;
+            newNode->bookingID = nextBookingID;
+            newNode->flightID = id;
+            newNode->passengerName = name;
+            newNode->next = head;
+            head = newNode;
+            flights[position].availableSeats--;
+            cout << "Ticket booked successfully." << endl;
+            cout << "Booking ID: " << nextBookingID << endl;
+            nextBookingID++;
+        }
     }
-}
 }
 void displayBookings(){
     if(head == NULL){
@@ -200,6 +208,18 @@ void displayBookings(){
         cout << "Flight ID: " << temp->flightID << endl;
         temp = temp->next;
     }
+}
+void pushCancelledBooking(int bookingID, int flightID, string name){
+    StackNode* newNode = new StackNode;
+    newNode->bookingID = bookingID;
+    newNode->flightID = flightID;
+    newNode->passengerName = name;
+    newNode->passengerPromoted = false;
+    newNode->promotedBookingID = 0;
+    newNode->promotedWaitingID = 0;
+    newNode->promotedPassengerName = "";
+    newNode->next = top;
+    top = newNode;
 }
 void giveSeatToWaitingPassenger(int flightID){
     WaitingNode* temp = front;
@@ -220,11 +240,16 @@ void giveSeatToWaitingPassenger(int flightID){
     newBooking->passengerName = temp->passengerName;
     newBooking->next = head;
     head = newBooking;
+	if(top != NULL){
+        top->passengerPromoted = true;
+        top->promotedBookingID = nextBookingID;
+        top->promotedWaitingID = temp->waitingID;
+        top->promotedPassengerName = temp->passengerName;
+    }
     if(prev == NULL)
         front = temp->next;
     else
         prev->next = temp->next;
-
     if(temp == rear)
         rear = prev;
     cout << "Waiting passenger " << temp->passengerName << " has been given the seat." << endl;
@@ -247,14 +272,95 @@ void cancelBooking(){
     }
     else{
         int flightID = temp->flightID;
+		int bookingID = temp->bookingID;
+        string name = temp->passengerName;
         if(prev == NULL)
             head = temp->next;
         else
             prev->next = temp->next;
         delete temp;
+		pushCancelledBooking(bookingID, flightID, name);
         cout << "Booking cancelled successfully." << endl;
 		giveSeatToWaitingPassenger(flightID);
     }
+}
+void displayCancellationHistory(){
+    if(top == NULL){
+        cout << "No cancellation history available." << endl;
+        return;
+    }
+    StackNode* temp = top;
+    cout << "\n===== CANCELLATION HISTORY (LATEST FIRST) =====" << endl;
+    while(temp != NULL){
+        cout << "Booking ID: " << temp->bookingID << endl;
+        cout << "Passenger Name: " << temp->passengerName << endl;
+        cout << "Flight ID: " << temp->flightID << endl;
+        temp = temp->next;
+    }
+}
+void restoreWaitingPassenger(int waitingID, int flightID, string name){
+    WaitingNode* newNode = new WaitingNode;
+    newNode->waitingID = waitingID;
+    newNode->flightID = flightID;
+    newNode->passengerName = name;
+    newNode->next = NULL;
+    if(front == NULL || waitingID < front->waitingID){
+        newNode->next = front;
+        front = newNode;
+        if(rear == NULL)
+            rear = newNode;
+    }
+    else{
+        WaitingNode* temp = front;
+        while(temp->next != NULL && temp->next->waitingID < waitingID)
+            temp = temp->next;
+        newNode->next = temp->next;
+        temp->next = newNode;
+        if(newNode->next == NULL)
+            rear = newNode;
+    }
+}
+void undoLastCancellation(){
+    if(top == NULL){
+        cout << "No cancellation to undo." << endl;
+        return;
+    }
+    StackNode* temp = top;
+    int position = searchFlightIndex(temp->flightID);
+    if(position == -1){
+        cout << "The original flight no longer exists. Undo cannot be completed." << endl;
+        return;
+    }
+    if(temp->passengerPromoted){
+        Node* booking = head;
+        Node* prevBooking = NULL;
+        while(booking != NULL && booking->bookingID != temp->promotedBookingID){
+            prevBooking = booking;
+            booking = booking->next;
+        }
+        if(booking == NULL){
+            cout << "Cannot undo because the promoted booking was changed." << endl;
+            return;
+        }
+        if(prevBooking == NULL)
+            head = booking->next;
+        else
+            prevBooking->next = booking->next;
+        delete booking;
+        restoreWaitingPassenger(temp->promotedWaitingID, temp->flightID, temp->promotedPassengerName);
+    }
+    else{
+        flights[position].availableSeats--;
+    }
+    Node* newBooking = new Node;
+    newBooking->bookingID = temp->bookingID;
+    newBooking->flightID = temp->flightID;
+    newBooking->passengerName = temp->passengerName;
+    newBooking->next = head;
+    head = newBooking;
+    top = temp->next;
+    delete temp;
+    cout << "Last cancellation has been undone." << endl;
 }
 void displayWaitingList(){
     if(front == NULL){
@@ -280,7 +386,6 @@ void cancelWaitingPassenger(){
         prev = temp;
         temp = temp->next;
     }
-
     if(temp == NULL){
         cout << "Waiting ID not found." << endl;
     }
@@ -289,10 +394,8 @@ void cancelWaitingPassenger(){
             front = temp->next;
         else
             prev->next = temp->next;
-
         if(temp == rear)
             rear = prev;
-
         delete temp;
         cout << "Waiting-list entry removed." << endl;
     }
@@ -310,6 +413,8 @@ int main(){
         cout << "7. Cancel Booking" << endl;
 		cout << "8. Display Waiting List" << endl;
         cout << "9. Cancel Waiting-List Entry" << endl;
+		cout << "10. Display Cancellation History" << endl;
+        cout << "11. Undo Last Cancellation" << endl;
         cout << "0. Exit" << endl;
         cout << "Enter your choice: ";
         cin >> choice;
@@ -324,6 +429,8 @@ int main(){
             case 7: cancelBooking(); break;
 			case 8: displayWaitingList(); break;
             case 9: cancelWaitingPassenger(); break;
+			case 10: displayCancellationHistory(); break;
+            case 11: undoLastCancellation(); break;
             case 0: cout << "Program ended." << endl; break;
             default: cout << "Invalid choice." << endl;
         }
